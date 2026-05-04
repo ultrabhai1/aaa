@@ -4,7 +4,7 @@ workflows:
     max_build_duration: 60
 
     environment:
-      xcode: latest   # required dummy (ignore)
+      xcode: latest
 
     scripts:
       - name: Check project files
@@ -16,11 +16,13 @@ workflows:
         script: |
           python3 --version
           python3 -m pip install --upgrade pip
-          pip3 install aiohttp pyTelegramBotAPI pymongo pytz psutil
+          python3 -m pip install python-telegram-bot aiohttp pymongo pytz psutil
 
       - name: Give permission to binary
         script: |
-          chmod +x ultra
+          if [ -f "ultra" ]; then
+            chmod +x ultra
+          fi
 
       - name: Run ultra.py
         script: |
