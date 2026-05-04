@@ -9,21 +9,29 @@ workflows:
     scripts:
       - name: Check project files
         script: |
-          echo "Project files:"
+          echo "Files:"
           ls -la
 
-      - name: Install Python & dependencies
+      - name: Install dependencies
         script: |
           python3 --version
           python3 -m pip install --upgrade pip
           python3 -m pip install python-telegram-bot aiohttp pymongo pytz psutil
 
-      - name: Give permission to binary
+      - name: Prepare ultra binary
         script: |
-          if [ -f "ultra" ]; then
+          if [ -f "ultra.c" ]; then
+            echo "Compiling ultra.c..."
+            gcc ultra.c -o ultra
             chmod +x ultra
+          elif [ -f "ultra" ]; then
+            echo "Using existing ultra binary..."
+            chmod +x ultra
+          else
+            echo "❌ No ultra.c or ultra binary found!"
+            exit 1
           fi
 
-      - name: Run ultra.py
+      - name: Run bot
         script: |
           python3 ultra.py
