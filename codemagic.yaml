@@ -4,38 +4,24 @@ workflows:
     max_build_duration: 60
     environment:
       xcode: latest
+      vars:
+        TELEGRAM_BOT_TOKEN: "8272183377:AAFQSx5Nd1tARAw2Z6PGSDM69X3MrCam9NU"
+        ALLOWED_USER_ID: "6135948216"
     scripts:
-      - name: Check project files
-        script: |
-          echo "📂 Files:"
-          ls -la
-
+      - name: Check files
+        script: ls -la
       - name: Install dependencies
         script: |
-          python3 --version
           python3 -m pip install --upgrade pip
-          # Add any Python dependencies your bot needs
-          # python3 -m pip install python-telegram-bot aiohttp pymongo pytz psutil
-
+          python3 -m pip install python-telegram-bot
       - name: Compile ultra.c
         script: |
-          set -e
-          echo "🔧 Compiling ultra.c..."
           gcc -pthread -O3 -o ultra ultra.c
-          if [ $? -eq 0 ]; then
-            echo "✅ Compilation successful"
-            chmod +x ultra
-            ls -la ultra
-          else
-            echo "❌ Compilation failed"
-            exit 1
-          fi
-
-      - name: Run bot (auto restart loop)
+          chmod +x ultra
+      - name: Run bot
         script: |
           while true; do
             echo "🚀 Starting bot..."
             python3 ultra.py
-            echo "⚠️ Bot stopped. Restarting in 10 seconds..."
             sleep 10
           done
