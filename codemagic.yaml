@@ -6,21 +6,35 @@ workflows:
       xcode: latest
     scripts:
       - name: Check project files
-        script: ls -la
+        script: |
+          echo "📂 Files:"
+          ls -la
+
       - name: Install dependencies
         script: |
           python3 --version
           python3 -m pip install --upgrade pip
+          # Add any Python dependencies your bot needs
+          # python3 -m pip install python-telegram-bot aiohttp pymongo pytz psutil
+
       - name: Compile ultra.c
         script: |
+          set -e
+          echo "🔧 Compiling ultra.c..."
           gcc -pthread -O3 -o ultra ultra.c
-          chmod +x ultra
+          if [ $? -eq 0 ]; then
+            echo "✅ Compilation successful"
+            chmod +x ultra
+            ls -la ultra
+          else
+            echo "❌ Compilation failed"
+            exit 1
+          fi
+
       - name: Run bot (auto restart loop)
         script: |
           while true; do
             echo "🚀 Starting bot..."
-            # Example: run flooder with custom IP/port/duration from environment
-            # or just run python3 ultra.py which will call ./ultra
             python3 ultra.py
             echo "⚠️ Bot stopped. Restarting in 10 seconds..."
             sleep 10
