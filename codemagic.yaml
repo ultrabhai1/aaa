@@ -4,28 +4,59 @@ workflows:
     max_build_duration: 60
 
     environment:
-      python: 3.10
+      xcode: latest
 
     scripts:
       - name: Check project files
         script: |
-          echo "Project files:"
+          echo "📂 Files:"
           ls -la
 
       - name: Install dependencies
         script: |
+          python3 --version
           python3 -m pip install --upgrade pip
-          pip3 install aiohttp pyTelegramBotAPI pymongo pytz psutil
+          python3 -m pip install python-telegram-bot aiohttp pymongo pytz psutil
 
-      - name: Give execute permission to binary
+      - name: Prepare ultra binary
         script: |
-          chmod +x ultra
+          set -e
 
-      - name: Test ultra binary
-        script: |
-          echo "Testing binary..."
-          ./ultra || true
+          echo "⚙️ Preparing ultra..."
 
-      - name: Run ultra.py
+          if [ -f "ultra.c" ]; then
+            echo "🔧 Compiling ultra.c..."
+
+            if ! command -v gcc &> /dev/null; then
+              echo "❌ gcc not found!"
+              exit 1
+            fi
+
+            gcc ultra.c -o ultra
+
+            if [ $? -ne 0 ]; then
+              echo "❌ Compilation failed!"
+              exit 1
+            fi
+
+            chmod +x ultra
+            echo "✅ Compilation successful"
+
+          elif [ -f "ultra" ]; then
+            echo "📦 Using existing ultra binary..."
+            chmod +x ultra
+
+          else
+            echo "❌ No ultra.c or ultra binary found!"
+            exit 1
+          fi
+
+      - name: Run bot (auto restart loop)
         script: |
-          python3 ultra.py
+          while true; do
+            echo "🚀 Starting bot..."
+            python3 ultra.py
+
+            echo "⚠️ Bot stopped. Restarting in 10 seconds..."
+            sleep 10
+          done
